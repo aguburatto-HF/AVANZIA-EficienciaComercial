@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Indicadores Comerciales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .btn {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Encabezado -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Panel de Indicadores Comerciales</h1>
+            <p class="text-gray-500 mt-1">Sube tus archivos PDF de ventas para analizar los datos y la inversión publicitaria.</p>
+        </header>
+
+        <!-- Sección de Carga de Archivos -->
+        <div class="mb-8 card p-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">1. Cargar Archivos de Ventas</h2>
+            <div class="flex items-center justify-center w-full">
+                <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Haz clic para cargar</span> o arrastra y suelta los archivos</p>
+                        <p class="text-xs text-gray-500">PDF (Múltiples archivos permitidos)</p>
+                    </div>
+                    <input id="dropzone-file" type="file" class="hidden" multiple accept=".pdf" />
+                </label>
+            </div>
+            <div id="file-list" class="mt-4 text-sm text-gray-600"></div>
+            <button id="analyze-files-btn" class="btn mt-4 hidden">Analizar</button>
+            <div id="loading-indicator" class="hidden flex flex-col items-center justify-center mt-4">
+                <div class="loader"></div>
+                <p class="mt-2 text-gray-600">Procesando archivos...</p>
+            </div>
+        </div>
+
+        <!-- Sección de Inversión Publicitaria -->
+        <div id="ad-spend-section" class="mb-8 card p-6 hidden">
+             <h2 class="text-xl font-semibold text-gray-700 mb-4">2. Ingresar Inversión en Publicidad ($)</h2>
+             <div id="ad-spend-inputs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+             <button id="calculate-efficiency" class="btn mt-6">Calcular Eficiencia</button>
+        </div>
+
+
+        <!-- Indicadores Clave -->
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6">
+                <h3 class="text-gray-500 font-medium">Ventas Totales (Unidades)</h3>
+                <p id="total-sales" class="text-3xl font-bold text-gray-800 mt-2">N/A</p>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-gray-500 font-medium">Inversión Publicitaria Total</h3>
+                <p id="total-ad-spend" class="text-3xl font-bold text-gray-800 mt-2">N/A</p>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-gray-500 font-medium">Costo Promedio por Venta</h3>
+                <p id="avg-cost-per-sale" class="text-3xl font-bold text-gray-800 mt-2">N/A</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+            <div class="card p-6">
+                <h3 class="text-gray-500 font-medium">Categoría Principal</h3>
+                <p id="top-category" class="text-2xl font-bold text-gray-800 mt-2">N/A</p>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-gray-500 font-medium">Mes con Más Ventas</h3>
+                <p id="top-month" class="text-2xl font-bold text-gray-800 mt-2">N/A</p>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="card p-6">
+                <h3 class="text-xl font-semibold text-gray-700">Ventas Mensuales</h3>
+                <canvas id="monthly-sales-chart"></canvas>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-xl font-semibold text-gray-700">Distribución por Categoría</h3>
+                <canvas id="category-distribution-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Análisis de Eficiencia -->
+        <div id="efficiency-analysis-section" class="hidden">
+            <div class="card p-6 mb-8">
+                <h3 class="text-xl font-semibold text-gray-700">Análisis de Inversión vs. Ventas por Categoría</h3>
+                <canvas id="efficiency-chart"></canvas>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-xl font-semibold text-gray-700">Detalle de Eficiencia por Categoría</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 mt-4">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ventas (Unidades)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inversión ($)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo por Venta ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="efficiency-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Filas generadas por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
+
+            const fileInput = document.getElementById('dropzone-file');
+            const fileListDiv = document.getElementById('file-list');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const calculateBtn = document.getElementById('calculate-efficiency');
+            const adSpendInputsContainer = document.getElementById('ad-spend-inputs');
+            const analyzeFilesBtn = document.getElementById('analyze-files-btn');
+
+            let allSalesData = [];
+            let adSpendData = {};
+            let charts = {};
+            let selectedFiles = [];
+            
+            allSalesData = [];
+            updateDashboard(false);
+
+            fileInput.addEventListener('change', (event) => {
+                selectedFiles = Array.from(event.target.files);
+                if (selectedFiles.length > 0) {
+                    fileListDiv.innerHTML = '';
+                    selectedFiles.forEach(file => {
+                         const fileItem = document.createElement('p');
+                         fileItem.textContent = `Archivo seleccionado: ${file.name}`;
+                         fileListDiv.appendChild(fileItem);
+                    });
+                    analyzeFilesBtn.classList.remove('hidden');
+                } else {
+                     analyzeFilesBtn.classList.add('hidden');
+                }
+            });
+
+            analyzeFilesBtn.addEventListener('click', async () => {
+                if (selectedFiles.length === 0) return;
+
+                loadingIndicator.classList.remove('hidden');
+                analyzeFilesBtn.classList.add('hidden');
+                allSalesData = [];
+
+                for (const file of selectedFiles) {
+                    const data = await parsePdf(file);
+                    allSalesData.push(...data);
+                }
+                
+                loadingIndicator.classList.add('hidden');
+                updateDashboard(false);
+            });
+            
+            calculateBtn.addEventListener('click', () => {
+                 updateDashboard(true);
+            });
+            
+            adSpendInputsContainer.addEventListener('click', (event) => {
+                const removeBtn = event.target.closest('.remove-category-btn');
+                if (removeBtn) {
+                    const categoryContainer = removeBtn.closest('.category-ad-spend-item');
+                    if (categoryContainer) {
+                        categoryContainer.remove();
+                    }
+                }
+            });
+
+
+            async function parsePdf(file) {
+                 const fileReader = new FileReader();
+                 return new Promise((resolve) => {
+                     fileReader.onload = async function() {
+                         const typedarray = new Uint8Array(this.result);
+                         const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                         let extractedData = [];
+                         for (let i = 1; i <= pdf.numPages; i++) {
+                             const page = await pdf.getPage(i);
+                             const textContent = await page.getTextContent();
+                             const pageText = textContent.items.map(item => item.str).join(' ');
+                             const dateRegex = /(\d{4}-\d{2})/;
+                             const matchDate = pageText.match(dateRegex);
+                             const month = matchDate ? matchDate[0] : 'Sin Fecha';
+                             
+                             const categoryRegex = /CATEGORIA:\s*([\w\s\/-]+?)(?:\s*TOTAL:.*?=\s*([\d\.,]+))/g;
+                             let match;
+                             while ((match = categoryRegex.exec(pageText)) !== null) {
+                                const category = match[1].trim();
+                                let salesText = '0';
+                                
+                                const totalMatchAfterCategory = pageText.substring(match.index).match(/TOTAL:.*?=\s*([\d\.]+)/);
+
+                                if(totalMatchAfterCategory) {
+                                    salesText = totalMatchAfterCategory[1];
+                                } else {
+                                     const inlineTotalRegex = /TOTAL:.*?=\s*([\d\.]+)/;
+                                     const inlineMatch = match[0].match(inlineTotalRegex);
+                                     if (inlineMatch) salesText = inlineMatch[1];
+                                }
+
+                                const sales = parseFloat(salesText.replace(/\./g, '').replace(',', '.'));
+                                if (!isNaN(sales)) {
+                                     extractedData.push({ month, category, sales });
+                                }
+                             }
+                         }
+                         resolve(extractedData);
+                     };
+                     fileReader.readAsArrayBuffer(file);
+                 });
+            }
+            
+            function renderAdSpendInputs(categories) {
+                const container = document.getElementById('ad-spend-inputs');
+                container.innerHTML = '';
+                categories.forEach(category => {
+                    const div = document.createElement('div');
+                    div.className = "category-ad-spend-item flex items-end gap-2";
+                    div.innerHTML = `
+                        <div class="flex-grow">
+                            <label for="ad-spend-${category}" class="block text-sm font-medium text-gray-700">${category}</label>
+                            <input type="number" name="ad-spend-${category}" id="ad-spend-${category}" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="0">
+                        </div>
+                        <button class="remove-category-btn p-2 text-gray-400 hover:text-red-600 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    `;
+                    container.appendChild(div);
+                });
+                document.getElementById('ad-spend-section').classList.remove('hidden');
+            }
+
+
+            function updateDashboard(calculateEfficiency = false) {
+                const currencyFormatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+
+                if (allSalesData.length === 0) {
+                    document.getElementById('total-sales').textContent = '0';
+                    document.getElementById('total-ad-spend').textContent = currencyFormatter.format(0);
+                    document.getElementById('avg-cost-per-sale').textContent = currencyFormatter.format(0);
+                    document.getElementById('top-category').textContent = 'N/A';
+                    document.getElementById('top-month').textContent = 'N/A';
+
+                    if (charts.monthly) { charts.monthly.destroy(); }
+                    if (charts.category) { charts.category.destroy(); }
+                    if (charts.efficiency) { charts.efficiency.destroy(); }
+                    charts = {};
+
+                    document.getElementById('ad-spend-section').classList.add('hidden');
+                    document.getElementById('efficiency-analysis-section').classList.add('hidden');
+                    return;
+                }
+
+                const totalSales = allSalesData.reduce((sum, item) => sum + item.sales, 0);
+                const categorySales = allSalesData.reduce((acc, item) => {
+                    acc[item.category] = (acc[item.category] || 0) + item.sales;
+                    return acc;
+                }, {});
+                const topCategory = Object.entries(categorySales).sort(([,a],[,b]) => b-a)[0];
+                const monthlySales = allSalesData.reduce((acc, item) => {
+                    acc[item.month] = (acc[item.month] || 0) + item.sales;
+                    return acc;
+                }, {});
+                const topMonth = Object.entries(monthlySales).sort(([,a],[,b]) => b-a)[0];
+                
+                const formatter = new Intl.NumberFormat('es-AR', { style: 'decimal', minimumFractionDigits: 0 });
+
+                document.getElementById('total-sales').textContent = formatter.format(totalSales);
+                document.getElementById('top-category').textContent = topCategory ? topCategory[0] : 'N/A';
+                document.getElementById('top-month').textContent = topMonth ? topMonth[0] : 'N/A';
+
+                updateMonthlySalesChart(monthlySales);
+                updateCategoryDistributionChart(categorySales);
+                
+                if (!calculateEfficiency) {
+                    renderAdSpendInputs(Object.keys(categorySales));
+                }
+                
+                if(calculateEfficiency) {
+                    adSpendData = {};
+                    let totalAdSpend = 0;
+                    const analyzedCategories = [];
+
+                    const adSpendInputs = document.querySelectorAll('#ad-spend-inputs input[type="number"]');
+                    adSpendInputs.forEach(input => {
+                        const category = input.id.replace('ad-spend-', '');
+                        const value = parseFloat(input.value) || 0;
+                        adSpendData[category] = value;
+                        totalAdSpend += value;
+                        analyzedCategories.push(category);
+                    });
+                    
+                    const analyzedCategorySales = {};
+                    let totalAnalyzedSales = 0;
+                    analyzedCategories.forEach(category => {
+                        analyzedCategorySales[category] = categorySales[category] || 0;
+                        totalAnalyzedSales += analyzedCategorySales[category];
+                    });
+
+                    const avgCostPerSale = totalAnalyzedSales > 0 ? totalAdSpend / totalAnalyzedSales : 0;
+
+                    document.getElementById('total-ad-spend').textContent = currencyFormatter.format(totalAdSpend);
+                    document.getElementById('avg-cost-per-sale').textContent = currencyFormatter.format(avgCostPerSale);
+                    
+                    updateEfficiencyMetrics(analyzedCategorySales, adSpendData);
+                    document.getElementById('efficiency-analysis-section').classList.remove('hidden');
+
+                }
+            }
+            
+            function updateEfficiencyMetrics(categorySales, adSpend) {
+                const efficiencyData = Object.keys(categorySales).map(category => {
+                    const sales = categorySales[category];
+                    const spend = adSpend[category] || 0;
+                    const cps = sales > 0 ? spend / sales : 0;
+                    return { category, sales, spend, cps };
+                });
+
+                const tableBody = document.getElementById('efficiency-table-body');
+                tableBody.innerHTML = '';
+                const currencyFormatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+                efficiencyData.sort((a,b) => b.sales - a.sales).forEach(item => {
+                    const row = `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.category}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.sales}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${currencyFormatter.format(item.spend)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold ${item.cps >= 0 && item.cps < 100 ? 'text-green-600' : 'text-red-600'}">${currencyFormatter.format(item.cps)}</td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+
+                updateEfficiencyChart(efficiencyData);
+            }
+            
+            function updateEfficiencyChart(efficiencyData) {
+                const ctx = document.getElementById('efficiency-chart').getContext('2d');
+                const labels = efficiencyData.map(d => d.category);
+                
+                if (charts.efficiency) charts.efficiency.destroy();
+
+                charts.efficiency = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'Ventas (Unidades)',
+                                data: efficiencyData.map(d => d.sales),
+                                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                                borderColor: 'rgb(59, 130, 246)',
+                                borderWidth: 1,
+                                yAxisID: 'ySales',
+                            },
+                            {
+                                label: 'Inversión ($)',
+                                data: efficiencyData.map(d => d.spend),
+                                backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                                borderColor: 'rgb(239, 68, 68)',
+                                borderWidth: 1,
+                                yAxisID: 'ySpend',
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                           ySales: {
+                               type: 'linear',
+                               display: true,
+                               position: 'left',
+                               title: { display: true, text: 'Ventas (Unidades)' }
+                           },
+                           ySpend: {
+                               type: 'linear',
+                               display: true,
+                               position: 'right',
+                               title: { display: true, text: 'Inversión ($)' },
+                               grid: { drawOnChartArea: false }
+                           }
+                        }
+                    }
+                });
+            }
+
+            function updateMonthlySalesChart(monthlySalesData) {
+                const ctx = document.getElementById('monthly-sales-chart').getContext('2d');
+                const sortedMonths = Object.keys(monthlySalesData).sort();
+                if (charts.monthly) charts.monthly.destroy();
+                charts.monthly = new Chart(ctx, { type: 'line', data: { labels: sortedMonths, datasets: [{ label: 'Ventas por Mes', data: sortedMonths.map(m => monthlySalesData[m]), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 }] }, options: { responsive: true, scales: { y: { beginAtZero: true } } } });
+            }
+
+            function updateCategoryDistributionChart(categorySalesData) {
+                const ctx = document.getElementById('category-distribution-chart').getContext('2d');
+                const labels = Object.keys(categorySalesData);
+                const backgroundColors = labels.map((_, i) => `hsl(${i * 360 / labels.length}, 70%, 60%)`);
+                if (charts.category) charts.category.destroy();
+                charts.category = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ label: 'Distribución de Ventas', data: Object.values(categorySalesData), backgroundColor: backgroundColors, hoverOffset: 4 }] }, options: { responsive: true } });
+            }
+        });
+    </script>
+</body>
+</html>
+
